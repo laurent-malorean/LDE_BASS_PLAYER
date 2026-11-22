@@ -1,0 +1,16 @@
+{
+  "name": "bass-player",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Apprendre la basse : théorie, manche, tablatures interactives",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test test/"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "marked": "^15.0.0",
+    "yaml": "^2.6.0"
+  }
+}
