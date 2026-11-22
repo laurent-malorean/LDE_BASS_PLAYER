@@ -272,3 +272,64 @@ test('doigtés : l\'option gauche:false masque le doigté de la main de frette m
   assert.ok(ev.every((e) => e.doigtFrette === undefined));
   assert.deepEqual(ev.map((e) => e.doigtPince), ['i', 'm', 'i']);
 });
+
+// ---- Format étendu : notes mortes, effets, fractions ----
+test('parserNotes : notes mortes, effets, fractions de temps', () => {
+  const r = parserNotes('Ax/.25 E5/1:3 E5/2:3t E5/1 G10/.5b A5/.5s A12/.5 E3/.25h E4/.25* -/.5');
+  assert.deepEqual(r.erreurs, []);
+  const [mort, tiers, deuxTiers, tenue, bend, glisse, cible, ham, hamCible] = r.evenements;
+  assert.equal(mort.mort, true); assert.equal(mort.frette, null); assert.equal(mort.midi, midiDe('A', 0));
+  assert.ok(Math.abs(tiers.duree + deuxTiers.duree - 1) < 1e-9, 'triolet : 1/3 + 2/3 = 1 temps');
+  assert.equal(tenue.sansAttaque, true); assert.equal(tenue.liePar, 't');
+  assert.equal(bend.effets.b, true);
+  assert.equal(cible.liePar, 's'); assert.equal(hamCible.liePar, 'h'); assert.equal(hamCible.effets['*'], true);
+  assert.equal(ham.sansAttaque, undefined);
+});
+
+test('parserNotes : effets mal placés signalés', () => {
+  assert.equal(parserNotes('E5/1t').erreurs.length, 1, 'liaison sans note suivante');
+  assert.equal(parserNotes('E5/1t A5').erreurs.length, 1, 'liaison entre notes différentes');
+  assert.equal(parserNotes('-/1s E5').erreurs.length, 1, 'effet sur un silence');
+  assert.equal(parserNotes('E5/0').erreurs.length, 1, 'durée nulle');
+  assert.equal(parserNotes('E5/1:0').erreurs.length, 1, 'fraction invalide');
+});
+
+test('doigtés : pas de lettre de main droite sur les notes liées, notes mortes sans doigt de frette', () => {
+  const ev = ajouterDoigtes(parserNotes('E3 Ex A5/.5s A7/.5 E0').evenements);
+  assert.equal(ev[1].doigtFrette, undefined, 'note morte : pas de doigt');
+  assert.equal(ev[1].doigtPince, 'm', 'mais elle est pincée');
+  assert.equal(ev[3].doigtPince, undefined, 'cible d\'un glissé : pas pincée');
+  assert.deepEqual([ev[0], ev[2], ev[4]].map((e) => e.doigtPince), ['i', 'i', 'm'], 'l\'alternance ne compte que les notes pincées');
+});
+
+test('séquenceur : liaison, glissé, hammer-on, bend, note morte et staccato', () => {
+  const { evenements, total } = parserNotes('E5/1t E5/1 A5/.5s A12/.5 E3/.5h E4/.5 G10/1b Ex/1 D5/1*');
+  const a = fauxAudio();
+  const appels = [];
+  a.jouerNote = (midi, t, d) => { appels.push(['note', midi, +t.toFixed(3), +d.toFixed(3)]); return { src: {}, baseFreq: 1, midi, rate: 1 }; };
+  a.jouerNoteMorte = (midi, t) => appels.push(['morte', midi, +t.toFixed(3)]);
+  a.changerHauteur = (h, midi, t, depuis) => appels.push(['change', midi, +t.toFixed(3), depuis == null ? null : +depuis.toFixed(3)]);
+  a.bend = (h, t) => appels.push(['bend', +t.toFixed(3)]);
+  globalThis.requestAnimationFrame = () => 0; globalThis.cancelAnimationFrame = () => {};
+  const origSet = globalThis.setInterval; globalThis.setInterval = () => 1;
+  const seq = new Sequenceur(a);
+  seq.demarrer({ bpm: 60, tempsParMesure: 4, evenements, total, metronome: false, decompte: 0, boucle: false });
+  globalThis.setInterval = origSet;
+  a.ctx.currentTime = 20; seq.planifier();
+  const t0 = seq.t0;
+  const rel = (x) => +(x - t0).toFixed(3);
+  const notes = appels.filter((x) => x[0] === 'note');
+  // E5 tenue = une seule attaque de 2 temps (puis la note liée n'est pas rejouée)
+  assert.equal(notes[0][1], midiDe('E', 5)); assert.ok(Math.abs(notes[0][3] - 2 * 0.95) < 1e-9);
+  // Le premier glissé : A5 puis A12, une seule attaque ; l'hammer-on E3 -> E4 aussi
+  assert.deepEqual(notes.map((n) => n[1]), [midiDe('E', 5), midiDe('A', 5), midiDe('E', 3), midiDe('G', 10), midiDe('D', 5)], 'seules les notes pincées sont attaquées');
+  const ch = appels.filter((x) => x[0] === 'change');
+  assert.equal(ch.length, 2);
+  assert.equal(ch[0][1], midiDe('A', 12)); assert.ok(ch[0][3] !== null && ch[0][3] < ch[0][2], 'glissé : la hauteur commence à bouger avant la note cible');
+  assert.equal(ch[1][1], midiDe('E', 4)); assert.equal(ch[1][3], null, 'hammer-on : changement net');
+  assert.equal(appels.filter((x) => x[0] === 'bend').length, 1);
+  assert.equal(appels.filter((x) => x[0] === 'morte').length, 1);
+  const stacc = notes.find((n) => n[1] === midiDe('D', 5));
+  assert.ok(stacc[3] < 0.5, 'staccato : note courte');
+  assert.ok(rel(stacc[2]) > 0);
+});

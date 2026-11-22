@@ -30,11 +30,24 @@ export function cordesAffichees(player) {
 export const midiDe = (corde, frette) => CORDES[corde] + frette;
 
 /**
- * Format texte d'une tablature : "E0 E3/0.5 - A2 | D5"
- *  - Lettre de corde + numéro de frette, ex. A3
- *  - /durée en temps (1 par défaut), ex. E3/0.5 pour une croche en 4/4
+ * Format texte d'une tablature : "E0 A3/0.5 - A2/1:3 | D5"
+ *  - Lettre de corde + numéro de frette, ex. A3 ; « x » = note morte (étouffée), ex. Ax
+ *  - /durée en temps (1 par défaut) : décimal (/0.5) ou fraction (/1:3 = un tiers de temps, pour les triolets)
  *  - "-" = silence, "|" = barre de mesure (affichage uniquement)
+ *  - effets, collés à la fin du jeton (ex. E5/0.5s) :
+ *      h = hammer-on vers la note suivante     p = pull-off vers la note suivante
+ *      s = glissé vers la note suivante        t = liaison : la note suivante est la même, tenue
+ *      b = bend d'un quart de ton              * = staccato (note courte)
+ * La note qui suit un h, p, s ou t n'est pas pincée : elle prolonge la précédente.
  */
+export const EFFETS = { h: 'hammer-on', p: 'pull-off', s: 'glissé', t: 'liaison', b: 'bend', '*': 'staccato' };
+
+function lireDuree(txt) {
+  if (txt === undefined) return 1;
+  const [n, d] = txt.split(':');
+  return d ? parseFloat(n) / parseFloat(d) : parseFloat(n);
+}
+
 export function parserNotes(texte) {
   const evenements = [];
   const erreurs = [];
@@ -42,17 +55,30 @@ export function parserNotes(texte) {
   let mesure = 0;
   for (const jeton of String(texte ?? '').split(/\s+/).filter(Boolean)) {
     if (jeton === '|') { mesure++; continue; }
-    const m = jeton.match(/^(?:([BEADG])(\d{1,2})|-)(?:\/(\d*\.?\d+))?$/i);
-    if (!m) { erreurs.push(`Jeton incompris : « ${jeton} »`); continue; }
-    const duree = m[3] ? parseFloat(m[3]) : 1;
-    const ev = { duree, debut, mesure, silence: !m[1] };
+    const m = jeton.match(/^(?:([BEADG])(\d{1,2}|x)|-)(?:\/(\d*\.?\d+(?::\d+)?))?([hpstb*]*)$/i);
+    const duree = m ? lireDuree(m[3]) : NaN;
+    if (!m || !(duree > 0) || !Number.isFinite(duree)) { erreurs.push(`Jeton incompris : « ${jeton} »`); continue; }
+    const ev = { duree, debut, mesure, silence: !m[1], effets: {} };
     if (m[1]) {
       ev.corde = m[1].toUpperCase();
-      ev.frette = parseInt(m[2], 10);
-      ev.midi = midiDe(ev.corde, ev.frette);
+      ev.mort = m[2].toLowerCase() === 'x';
+      ev.frette = ev.mort ? null : parseInt(m[2], 10);
+      ev.midi = midiDe(ev.corde, ev.frette ?? 0); // une note morte garde la hauteur de la corde à vide
     }
+    for (const c of m[4].toLowerCase()) ev.effets[c] = true;
+    if (ev.silence && m[4]) { erreurs.push(`Un silence ne peut pas avoir d'effet : « ${jeton} »`); continue; }
     evenements.push(ev);
     debut += duree;
+  }
+  // La note qui suit un h/p/s/t n'est pas pincée : on la marque pour l'audio, le micro et les doigtés.
+  for (let i = 0; i < evenements.length; i++) {
+    const e = evenements[i];
+    if (!(e.effets.h || e.effets.p || e.effets.s || e.effets.t)) continue;
+    const suivant = evenements[i + 1];
+    if (!suivant || suivant.silence) { erreurs.push(`Effet sans note suivante après la note ${i + 1}`); continue; }
+    suivant.sansAttaque = true;
+    suivant.liePar = e.effets.t ? 't' : e.effets.s ? 's' : e.effets.h ? 'h' : 'p';
+    if (e.effets.t && (suivant.mort || suivant.midi !== e.midi)) erreurs.push(`Liaison entre deux notes différentes (note ${i + 1})`);
   }
   return { evenements, total: debut, erreurs };
 }
@@ -60,17 +86,18 @@ export function parserNotes(texte) {
 /**
  * Doigtés automatiques.
  *  - Main de frette : un doigt par frette. La position est fixée sur la frette la plus basse
- *    jouée (hors corde à vide) ; corde à vide = 0 (aucun doigt).
- *  - Main de pincement : alternance index (i) / majeur (m) sur les notes jouées.
+ *    jouée (hors corde à vide et notes mortes) ; corde à vide = 0 (aucun doigt).
+ *  - Main de pincement : alternance index (i) / majeur (m) sur les notes réellement pincées
+ *    (pas sur celles qui suivent un hammer-on, un glissé ou une liaison).
  */
 export function ajouterDoigtes(evenements, { gauche = true } = {}) {
-  const frettes = evenements.filter((e) => !e.silence && e.frette > 0).map((e) => e.frette);
+  const frettes = evenements.filter((e) => !e.silence && !e.mort && e.frette > 0).map((e) => e.frette);
   const base = frettes.length ? Math.min(...frettes) : 1;
   let alt = 0;
   for (const e of evenements) {
     if (e.silence) continue;
-    if (gauche) e.doigtFrette = e.frette === 0 ? 0 : Math.min(4, Math.max(1, e.frette - base + 1));
-    e.doigtPince = alt++ % 2 === 0 ? 'i' : 'm';
+    if (gauche && !e.mort) e.doigtFrette = e.frette === 0 ? 0 : Math.min(4, Math.max(1, e.frette - base + 1));
+    if (!e.sansAttaque) e.doigtPince = alt++ % 2 === 0 ? 'i' : 'm';
   }
   return evenements;
 }

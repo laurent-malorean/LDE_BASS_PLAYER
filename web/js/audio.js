@@ -78,6 +78,51 @@ export class Audio {
     src.connect(lp); lp.connect(g); g.connect(this.master);
     src.start(t);
     src.stop(fin + 0.3);
+    return { src, baseFreq, midi, rate: src.playbackRate.value };
+  }
+
+  /** Note morte (étouffée) : un « toc » grave et très court, sans hauteur nette. */
+  jouerNoteMorte(midi, quand = 0) {
+    const ctx = this.init();
+    const t = Math.max(quand, ctx.currentTime);
+    const { buf, baseFreq } = this.tampon(midi);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = freq(midi) / baseFreq;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 260; lp.Q.value = 0.7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.55, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.07);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t); src.stop(t + 0.12);
+  }
+
+  /**
+   * Change la hauteur d'une note qui sonne déjà (hammer-on, pull-off, glissé, bend) sans la repincer.
+   * glisseDepuis : si fourni, la hauteur glisse progressivement de cet instant jusqu'à `quand`.
+   */
+  changerHauteur(h, midi, quand, glisseDepuis = null) {
+    const rate = freq(midi) / h.baseFreq;
+    const p = h.src.playbackRate;
+    if (glisseDepuis !== null) {
+      p.setValueAtTime(h.rate, Math.max(glisseDepuis, this.ctx.currentTime));
+      p.linearRampToValueAtTime(rate, quand);
+    } else {
+      p.setValueAtTime(h.rate, Math.max(quand - 0.002, this.ctx.currentTime));
+      p.linearRampToValueAtTime(rate, quand + 0.006);
+    }
+    h.rate = rate; h.midi = midi;
+  }
+
+  /** Bend d'un quart de ton (50 cents) vers le haut, sur la durée donnée. */
+  bend(h, quand, duree) {
+    const rate = h.rate * 2 ** (50 / 1200);
+    const p = h.src.playbackRate;
+    p.setValueAtTime(h.rate, Math.max(quand, this.ctx.currentTime));
+    p.linearRampToValueAtTime(rate, quand + Math.min(0.12, duree * 0.6));
+    h.rate = rate;
   }
 
   clic(quand, accent = false, doux = false) {
@@ -165,7 +210,7 @@ export class Sequenceur {
       const i = this.prochaineNote;
       const e = o.evenements[i];
       const t = tempsAbs(e.debut);
-      if (!e.silence) this.audio.jouerNote(e.midi, t, e.duree * this.spb * 0.95);
+      if (!e.silence) this.jouer(e, i, t);
       this.file.push({ t, fn: () => o.onNote?.(i) });
       this.prochaineNote++;
     }
@@ -183,9 +228,30 @@ export class Sequenceur {
     }
   }
 
+  // Joue une note en tenant compte des effets : liaison, glissé, hammer-on / pull-off, bend, note morte, staccato.
+  jouer(e, i, t) {
+    const evs = this.o.evenements;
+    const spb = this.spb;
+    if (e.mort) { this.audio.jouerNoteMorte(e.midi, t); this.poignee = null; return; }
+    if (e.sansAttaque && this.poignee) {
+      const prev = evs[i - 1];
+      if (e.liePar === 's') this.audio.changerHauteur(this.poignee, e.midi, t, t - prev.duree * spb * 0.35);
+      else if (e.liePar !== 't') this.audio.changerHauteur(this.poignee, e.midi, t); // h / p
+      if (e.effets.b) this.audio.bend(this.poignee, t, e.duree * spb);
+      return;
+    }
+    // durée sonore = la note + toutes les notes liées qui la suivent
+    let duree = e.duree;
+    for (let k = i + 1; k < evs.length && evs[k].sansAttaque && !evs[k].silence; k++) duree += evs[k].duree;
+    const longueur = duree * spb * (e.effets['*'] ? 0.3 : 0.95);
+    this.poignee = this.audio.jouerNote(e.midi, t, longueur);
+    if (e.effets.b) this.audio.bend(this.poignee, t, e.duree * spb);
+  }
+
   arreter() {
     this.actif = false;
     this.finPlanifiee = false;
+    this.poignee = null;
     clearInterval(this.timer);
     cancelAnimationFrame(this.raf);
     this.file = [];

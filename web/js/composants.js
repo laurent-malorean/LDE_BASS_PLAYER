@@ -121,7 +121,8 @@ export function lecteurTablature(ex, { complet = false } = {}) {
   async function jouerMicro() {
     arreter(false);
     if (!reglage('micro.actif')) { toast('Le micro est désactivé dans la configuration.', 'erreur'); return; }
-    const notes = evenements.map((e, i) => ({ e, i })).filter((x) => !x.e.silence);
+    // Pas de validation pour les silences, les notes mortes (pas de hauteur) ni les notes liées ou glissées (pas d'attaque).
+    const notes = evenements.map((e, i) => ({ e, i })).filter((x) => !x.e.silence && !x.e.mort && !(x.e.sansAttaque && (x.e.liePar === 't' || x.e.liePar === 's')));
     if (!notes.length) return;
     let pos = 0; let fautes = 0; let fini = false;
     const validateur = new Validateur({

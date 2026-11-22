@@ -88,3 +88,7 @@ input[type=range] { accent-color: var(--accent); min-width: 140px; } select, inp
 .toast.erreur { background: var(--ko); color: #fff; } .toast.ok { background: var(--ok); color: #fff; }
 @media (max-width: 600px) { main { padding: 12px 12px 60px; } .bpm-gros { font-size: 3.6rem; } }
 .legende-tab { margin: 4px 0 0; } .legende-tab .cle-frette { color: var(--note); } .legende-tab .cle-pince { color: var(--accent); }
+.tablature .frette-num.morte { font-style: italic; } .tablature .frette-num.petite { font-size: 10px; }
+.tablature .staccato, .tablature .bend { fill: var(--discret); font-size: 11px; font-weight: 700; }
+.tablature .arc { fill: none; stroke: var(--discret); stroke-width: 1.4; } .tablature .glisse { stroke: var(--discret); stroke-width: 1.8; }
+.tablature .lettre-lien { fill: var(--discret); font-size: 10px; font-weight: 700; }
