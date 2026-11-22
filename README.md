@@ -39,9 +39,27 @@ fichiers `*.example.*`. Pour le placer ailleurs (par exemple ton dépôt privé 
     chiffrage: "4/4"
     notes: "E0 A3/0.5 A5/0.5 -/1 D2 | G5"
 
-`E0` = corde de Mi à vide, `A3` = corde de La frette 3, `/0.5` = durée en temps (1 par défaut),
-`-` = silence, `|` = barre de mesure. Les doigtés (main de frette, i/m) sont calculés automatiquement.
+| Jeton | Sens |
+|---|---|
+| `E0`, `A3` | corde (B E A D G) + frette |
+| `Ax` | note morte (étouffée) sur la corde de La |
+| `/0.5`, `/.25`, `/1:3` | durée en temps (1 par défaut) ; `/1:3` = un tiers de temps (triolet) |
+| `-` | silence (`-/.5` = demi-soupir) |
+| `\|` | barre de mesure (affichage) |
+| `h` `p` | hammer-on / pull-off vers la note suivante (`E3/.25h E4`) |
+| `s` | glissé vers la note suivante (`A5/.5s A12`) |
+| `t` | liaison : la note suivante, identique, est tenue et non rejouée (`G10/.5t G10/1`) |
+| `b` | bend d'un quart de ton |
+| `*` | staccato |
+
+La note qui suit un `h`, `p`, `s` ou `t` n'est pas pincée : pas de lettre de main droite, pas de validation au micro
+pour les glissés et liaisons. Les doigtés de la main de frette sont calculés automatiquement
+(un doigt par frette) ; ajoute `doigtes_gauche: aucun` pour les masquer quand la main se déplace.
 Mets les textes contenant « : » entre guillemets.
+
+Vérifier des tablatures (YAML, jetons, bon nombre de temps par mesure), y compris celles de `perso/` :
+
+    npm run verifier
 
 ## Écrire une leçon
 

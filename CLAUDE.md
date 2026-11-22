@@ -69,7 +69,9 @@ Le projet est conçu pour devenir **deux dépôts** :
 
 - **YAML** : un texte contenant « : » doit être entre guillemets (exercices `.yml` et en-têtes des leçons).
   Les tests le vérifient pour le contenu du dépôt.
-- Format d'une tablature : `E0 A3/0.5 -/1 | D2` (corde+frette, `/durée` en temps, `-` silence, `|` mesure).
+- Format d'une tablature : `E0 A3/0.5 -/1 | D2` (corde+frette, `/durée` en temps, `-` silence, `|` mesure) ; effets `h p s t b *`,
+  note morte `x`, fractions `/1:3` — voir README. `npm run verifier` contrôle les tablatures (aussi celles de `perso/`).
+- Les riffs issus de livres du commerce restent dans `perso/` (dépôt privé), jamais dans `content/` (public).
 - Ne jamais modifier les objets de valeurs par défaut partagés (cloner avant de fusionner).
 - Écritures de données : toujours via `Storage` (noms validés, écriture atomique), jamais `fs` direct.
 
