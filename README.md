@@ -3,6 +3,26 @@
 Application web locale pour apprendre la basse : théorie, manche, tablatures interactives,
 métronome, accordeur, écoute au micro.
 
+## Aperçu
+
+**Un manche interactif** : chaque case se clique pour entendre la note, avec son nom en notation française ou anglaise.
+
+![Le manche de basse avec toutes les notes, et les astuces pour les retenir](docs/screenshots/manche.png)
+
+**Des exercices en tablature** avec le doigté de chaque main, le comptage des temps, la lecture sonore, le métronome et la
+validation de ce que tu joues au micro.
+
+![Une tablature avec doigtés main gauche, main droite et comptage des temps](docs/screenshots/exercice.png)
+
+**Deux onglets** pour séparer les exercices du cours et tes propres tablatures.
+
+![La liste des exercices avec les onglets « Exercices du cours » et « Mes tablatures »](docs/screenshots/exercices.png)
+
+**Un métronome** (tempo, mesure, subdivisions, tap tempo) et **un tableau de bord** de progression.
+
+![Le métronome](docs/screenshots/metronome.png)
+![L'accueil avec la progression](docs/screenshots/accueil.png)
+
 ## Démarrer
 
     npm install
