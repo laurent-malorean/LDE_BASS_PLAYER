@@ -6,7 +6,8 @@
   "description": "Apprendre la basse : théorie, manche, tablatures interactives",
   "scripts": {
     "start": "node server/index.js",
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "verifier": "node scripts/verifier-tablatures.js"
   },
   "engines": { "node": ">=20" },
   "dependencies": {
