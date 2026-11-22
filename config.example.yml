@@ -1,0 +1,43 @@
+# Configuration de l'application Bass Player
+# Copiez ce fichier en config.yml puis modifiez ce que vous voulez.
+# Tout est optionnel : une valeur absente prend sa valeur par défaut.
+# Priorité : option de ligne de commande / variable d'environnement > config.yml > défaut
+
+serveur:
+  port: 3000              # port d'écoute (1-65535) ou "auto" pour un port libre
+  hote: localhost         # localhost = accessible seulement depuis ce Mac
+  ouvrir_navigateur: true # ouvre la page au démarrage
+
+dossiers:
+  contenu: ./content
+  donnees: ./data
+  sauvegardes: ./backups
+
+sauvegarde:
+  active: true
+  frequence: quotidienne  # quotidienne | a_chaque_demarrage
+  conserver: 30           # nombre de sauvegardes gardées
+
+audio:
+  volume_general: 0.8     # 0 à 1
+  son_basse: synthese     # synthese | echantillons (pas encore disponible)
+  metronome:
+    bpm_defaut: 80
+    chiffrage: "4/4"
+    volume: 0.6
+    decompte_mesures: 1
+    son: clic             # clic | bois | cloche
+
+micro:
+  actif: true
+  peripherique: defaut    # nom de l'entrée audio, ou "defaut"
+  sensibilite: 0.5        # 0 (peu sensible) à 1 (très sensible)
+  tolerance_cents: 35     # écart de justesse accepté
+  tolerance_temps_ms: 150 # écart rythmique accepté
+
+interface:
+  theme: auto             # clair | sombre | auto
+  taille_manche: moyenne  # petite | moyenne | grande
+
+avance:
+  journal: info           # erreur | info | debug
