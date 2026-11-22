@@ -3,3 +3,4 @@ node_modules.nosync
 perso/
 .DS_Store
 .claude/settings.local.json
+tmp/
