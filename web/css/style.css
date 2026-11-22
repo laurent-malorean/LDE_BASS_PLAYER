@@ -92,3 +92,7 @@ input[type=range] { accent-color: var(--accent); min-width: 140px; } select, inp
 .tablature .staccato, .tablature .bend { fill: var(--discret); font-size: 11px; font-weight: 700; }
 .tablature .arc { fill: none; stroke: var(--discret); stroke-width: 1.4; } .tablature .glisse { stroke: var(--discret); stroke-width: 1.8; }
 .tablature .lettre-lien { fill: var(--discret); font-size: 10px; font-weight: 700; }
+.onglets { display: flex; gap: 4px; border-bottom: 1px solid var(--bord); margin: 8px 0 14px; flex-wrap: wrap; }
+.onglet { font: inherit; background: none; color: var(--discret); border: 1px solid transparent; border-bottom: none; border-radius: 10px 10px 0 0; padding: 8px 16px; cursor: pointer; margin-bottom: -1px; }
+.onglet:hover { color: var(--texte); } .onglet.actif { background: var(--carte); color: var(--texte); border-color: var(--bord); font-weight: 600; }
+.onglet .badge { margin-left: 8px; }

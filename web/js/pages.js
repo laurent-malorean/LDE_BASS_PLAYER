@@ -68,28 +68,73 @@ export async function lecon(zone, [cat, id]) {
   zone.append(h('p', { class: 'fil' }, h('a', { href: `#/${cat}` }, CATS[cat]), ' › ', l.titre), h('h1', {}, l.titre), rendreMarkdown(l.markdown), h('div', { class: 'pied-lecon' }, bouton));
 }
 
+const ONGLETS = [
+  { cle: 'cours', titre: 'Exercices du cours', vide: 'Aucun exercice du cours.' },
+  { cle: 'perso', titre: 'Mes tablatures', vide: 'Tu n’as pas encore de tablature perso. Dépose un fichier .yml dans perso/data/mes-tablatures/ (même format que content/exercices/, voir le README) : il apparaîtra ici.' },
+];
+
 export async function exercices(zone) {
-  const [liste, ...donnees] = [await api.exercices()];
-  const stats = await Promise.all(liste.map((e) => api.lire('exercices/' + e.id)));
-  zone.append(h('h1', {}, 'Exercices en tablature'),
-    h('p', { class: 'discret' }, 'Tes propres tablatures : dépose un fichier .yml dans data/mes-tablatures/ (même format que content/exercices/).'),
-    h('ul', { class: 'liste-lecons' }, liste.map((e, i) => h('li', {},
-      h('a', { href: `#/exercices/${e.id}` }, e.titre ?? e.id), e.source === 'perso' ? h('span', { class: 'badge' }, 'perso') : null,
-      e.niveau ? h('span', { class: 'badge' }, e.niveau) : null,
-      stats[i] ? h('span', { class: 'discret' }, ` · ${stats[i].essais} essai(s), meilleur ${stats[i].meilleur_bpm || '—'} BPM`) : null,
-      e.erreur ? h('span', { class: 'erreur' }, ' ' + e.erreur) : null))));
+  const liste = await api.exercices();
+  const stats = new Map((await Promise.all(liste.map(async (e) => [e.id, await api.lire('exercices/' + e.id)]))));
+  let courant = reglage('interface.onglet_exercices') === 'perso' ? 'perso' : 'cours';
+  const panneau = h('div', { role: 'tabpanel', id: 'panneau-exercices' });
+  const barre = h('div', { class: 'onglets', role: 'tablist', 'aria-label': 'Type d’exercices' });
+
+  const dessiner = () => {
+    for (const b of barre.children) {
+      const actif = b.dataset.cle === courant;
+      b.setAttribute('aria-selected', actif);
+      b.tabIndex = actif ? 0 : -1;
+      b.classList.toggle('actif', actif);
+    }
+    const o = ONGLETS.find((x) => x.cle === courant);
+    const items = liste.filter((e) => e.source === courant);
+    panneau.setAttribute('aria-labelledby', `onglet-${courant}`);
+    panneau.replaceChildren(items.length
+      ? h('ul', { class: 'liste-lecons' }, items.map((e) => {
+        const st = stats.get(e.id);
+        return h('li', {},
+          h('a', { href: `#/exercices/${e.id}` }, e.titre ?? e.id),
+          e.niveau ? h('span', { class: 'badge' }, e.niveau) : null,
+          st ? h('span', { class: 'discret' }, ` · ${st.essais} essai(s), meilleur ${st.meilleur_bpm || '—'} BPM`) : null,
+          e.erreur ? h('span', { class: 'erreur' }, ' ' + e.erreur) : null);
+      }))
+      : h('p', { class: 'discret' }, o.vide));
+  };
+  const choisir = (cle, { focus = false } = {}) => {
+    if (cle === courant) return;
+    courant = cle; dessiner();
+    if (focus) barre.querySelector(`[data-cle="${cle}"]`).focus();
+    modifierReglage('interface.onglet_exercices', cle).catch(() => {}); // mémorisé dans data/reglages.json
+  };
+  for (const o of ONGLETS) {
+    const n = liste.filter((e) => e.source === o.cle).length;
+    const b = h('button', { class: 'onglet', role: 'tab', id: `onglet-${o.cle}`, 'data-cle': o.cle, 'aria-controls': 'panneau-exercices', type: 'button' },
+      o.titre, h('span', { class: 'badge' }, String(n)));
+    b.addEventListener('click', () => choisir(o.cle));
+    b.addEventListener('keydown', (ev) => {
+      if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') {
+        ev.preventDefault();
+        choisir(ONGLETS.find((x) => x.cle !== courant).cle, { focus: true });
+      }
+    });
+    barre.append(b);
+  }
+  zone.append(h('h1', {}, 'Exercices en tablature'), barre, panneau);
+  dessiner();
 }
 
 export async function exercice(zone, [id]) {
   const ex = await api.exercice(id);
   if (!ex || ex.erreur) { zone.append(h('p', { class: 'erreur' }, ex?.erreur ?? 'Exercice introuvable.')); return; }
+  if (reglage('interface.onglet_exercices') !== ex.source && (ex.source === 'perso' || ex.source === 'cours')) modifierReglage('interface.onglet_exercices', ex.source).catch(() => {});
   const debut = Date.now();
   nettoyages.add(() => {
     const min = (Date.now() - debut) / 60000;
     if (min > 0.3) api.noterActivite({ type: 'exercice', id, minutes: Math.round(min * 10) / 10 }).catch(() => {});
   });
   zone.append(
-    h('p', { class: 'fil' }, h('a', { href: '#/exercices' }, 'Exercices'), ' › ', ex.titre ?? id),
+    h('p', { class: 'fil' }, h('a', { href: '#/exercices' }, 'Exercices'), ' › ', ONGLETS.find((o) => o.cle === ex.source)?.titre ?? '', ' › ', ex.titre ?? id),
     h('h1', {}, ex.titre ?? id),
     ex.origine ? h('p', { class: 'discret' }, '♪ ' + ex.origine) : null,
     ex.consigne ? h('p', { class: 'intro' }, ex.consigne) : null,
