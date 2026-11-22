@@ -49,6 +49,11 @@ export function lecteurTablature(ex, { complet = false } = {}) {
 
   const tab = creerTablature(evenements, { player: etat.player, tempsParMesure: tpm, largeurMax: complet ? 1150 : 900 });
   racine.append(h('div', { class: 'tab-conteneur' }, tab.svg));
+  const doigtsGauche = ex.doigtes_gauche !== 'aucun';
+  racine.append(h('p', { class: 'legende legende-tab' },
+    doigtsGauche ? h('span', {}, h('b', { class: 'cle-frette' }, 'Au-dessus'), ` : doigt de la main ${etat.player.main_frette} (1 index · 2 majeur · 3 annulaire · 4 auriculaire · ○ corde à vide)`) : null,
+    doigtsGauche ? ' — ' : null,
+    h('span', {}, h('b', { class: 'cle-pince' }, 'En dessous'), ` : doigt de la main ${etat.player.main_pincement} (i index · m majeur), puis le comptage des temps.`)));
 
   const seq = new Sequenceur(etat.audio);
   let bpm = Math.round(ex.bpm ?? reglage('audio.metronome.bpm_defaut'));
